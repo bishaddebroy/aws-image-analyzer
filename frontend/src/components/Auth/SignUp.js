@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { register } from '../services/api';
+import { register } from '../../services/api';
 import Loader from '../Common/Loader';
 
 const SignUp = ({ onSignUp }) => {

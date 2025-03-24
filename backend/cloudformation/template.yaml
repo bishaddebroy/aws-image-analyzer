@@ -33,7 +33,6 @@ Globals:
     Environment:
       Variables:
         STAGE: !Ref Stage
-    Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
 
 Resources:
   # Cognito User Pool for Authentication
@@ -136,6 +135,7 @@ Resources:
     Properties:
       CodeUri: ../functions/auth_handler/
       Handler: auth_handler.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
         Variables:
           STAGE: !Ref Stage
@@ -159,6 +159,7 @@ Resources:
     Properties:
       CodeUri: ../functions/image_handler/
       Handler: image_handler.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
         Variables:
           RESULTS_TABLE: !Ref ResultsTable
@@ -203,6 +204,7 @@ Resources:
     Properties:
       CodeUri: ../functions/workflow_trigger/
       Handler: workflow_trigger.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
         Variables:
           STATE_MACHINE_ARN: !Ref ImageProcessingStateMachine
@@ -222,6 +224,7 @@ Resources:
     Properties:
       CodeUri: ../functions/detect_labels/
       Handler: detect_labels.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
         Variables:
           IMAGE_BUCKET: !Ref ImageBucket
@@ -234,6 +237,7 @@ Resources:
     Properties:
       CodeUri: ../functions/detect_moderation/
       Handler: detect_moderation.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
         Variables:
           IMAGE_BUCKET: !Ref ImageBucket
@@ -246,6 +250,7 @@ Resources:
     Properties:
       CodeUri: ../functions/detect_faces/
       Handler: detect_faces.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
         Variables:
           IMAGE_BUCKET: !Ref ImageBucket
@@ -258,6 +263,7 @@ Resources:
     Properties:
       CodeUri: ../functions/recognize_celebrities/
       Handler: recognize_celebrities.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
         Variables:
           IMAGE_BUCKET: !Ref ImageBucket
@@ -270,6 +276,7 @@ Resources:
     Properties:
       CodeUri: ../functions/detect_text/
       Handler: detect_text.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
         Variables:
           IMAGE_BUCKET: !Ref ImageBucket
@@ -282,6 +289,7 @@ Resources:
     Properties:
       CodeUri: ../functions/results_processor/
       Handler: results_processor.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
         Variables:
           RESULTS_TABLE: !Ref ResultsTable

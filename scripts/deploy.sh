@@ -26,6 +26,8 @@ pip install -r backend/requirements.txt -t backend/layers/common_dependencies/py
 echo "Creating EC2 key pair..."
 aws ec2 describe-key-pairs --key-names $EC2_KEY_NAME > /dev/null 2>&1
 if [ $? -ne 0 ]; then
+  mkdir -p ~/.ssh
+  chmod 700 ~/.ssh
   aws ec2 create-key-pair --key-name $EC2_KEY_NAME --query "KeyMaterial" --output text > ~/.ssh/$EC2_KEY_NAME.pem
   chmod 400 ~/.ssh/$EC2_KEY_NAME.pem
   echo "Created new key pair: $EC2_KEY_NAME"
@@ -52,6 +54,11 @@ aws cloudformation deploy \
     KeyPairName=$EC2_KEY_NAME \
     UserDataBucket=$S3_BUCKET \
     UserDataKey=ec2_setup.sh
+
+if [ $? -ne 0 ]; then
+  echo "CloudFormation deployment failed. Exiting."
+  exit 1
+fi
 
 # Wait for deployment to complete
 echo "Waiting for stack deployment to complete..."
