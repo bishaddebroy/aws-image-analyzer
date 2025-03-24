@@ -74,17 +74,12 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub '${AppName}-images-${AWS::AccountId}-${Stage}'
-      NotificationConfiguration:
-        LambdaConfigurations:
-          - Event: s3:ObjectCreated:*
-            Function: !GetAtt WorkflowTriggerFunction.Arn
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
             AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
             AllowedOrigins: ['*']
             MaxAge: 3600
-    DependsOn: WorkflowTriggerFunctionPermission
   
   # DynamoDB Table for Image Analysis Results
   ResultsTable:
@@ -212,11 +207,29 @@ Resources:
       Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
         Variables:
-          STATE_MACHINE_ARN: !Ref ImageProcessingStateMachine
           RESULTS_TABLE: !Ref ResultsTable
       Layers:
         - !Ref CommonDependenciesLayer
   
+  # Permission for S3 to invoke Lambda - uses explicit bucket name pattern
+  WorkflowTriggerFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WorkflowTriggerFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub "arn:aws:s3:::${AppName}-images-${AWS::AccountId}-${Stage}"
+  
+  # New image validation function
+  ImageValidationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../functions/image_validation/
+      Handler: image_validation.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Layers:
+        - !Ref CommonDependenciesLayer
+
   # Detect Labels Function
   DetectLabelsFunction:
     Type: AWS::Serverless::Function
@@ -295,12 +308,41 @@ Resources:
       Layers:
         - !Ref CommonDependenciesLayer
   
+  # S3 Notification Setup Function
+  S3NotificationSetupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../functions/s3_notification_setup/
+      Handler: s3_notification_setup.lambda_handler
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+      Timeout: 60
+      Environment:
+        Variables:
+          RESULTS_TABLE: !Ref ResultsTable
+      Layers:
+        - !Ref CommonDependenciesLayer
+
+  # Custom resource for S3 notification setup
+  S3NotificationSetup:
+    Type: Custom::S3NotificationSetup
+    DependsOn:
+      - ImageBucket
+      - WorkflowTriggerFunction
+      - ImageProcessingStateMachine
+      - WorkflowTriggerFunctionPermission
+    Properties:
+      ServiceToken: !GetAtt S3NotificationSetupFunction.Arn
+      BucketName: !Ref ImageBucket
+      FunctionArn: !GetAtt WorkflowTriggerFunction.Arn
+      StateMachineArn: !Ref ImageProcessingStateMachine
+
   # Step Functions State Machine
   ImageProcessingStateMachine:
     Type: AWS::Serverless::StateMachine
     Properties:
       DefinitionUri: ../step_functions/image_processing.asl.json
       DefinitionSubstitutions:
+        ImageValidationFunction: !GetAtt ImageValidationFunction.Arn
         DetectLabelsFunction: !GetAtt DetectLabelsFunction.Arn
         DetectModerationFunction: !GetAtt DetectModerationFunction.Arn
         DetectFacesFunction: !GetAtt DetectFacesFunction.Arn
@@ -346,17 +388,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${AppName}-web-server'
-
-  # S3 notification configuration
-
-  # Permission for S3 to invoke Lambda
-  WorkflowTriggerFunctionPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WorkflowTriggerFunction
-      Principal: s3.amazonaws.com
-      SourceArn: !Sub "arn:aws:s3:::${ImageBucket}"
 
 Outputs:
   ApiEndpoint:

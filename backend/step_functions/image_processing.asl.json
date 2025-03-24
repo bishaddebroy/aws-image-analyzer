@@ -1,132 +1,141 @@
 {
-    "Comment": "Image Processing Workflow",
-    "StartAt": "ValidateImage",
-    "States": {
-      "ValidateImage": {
-        "Type": "Task",
-        "Resource": "${DetectLabelsFunction}",
-        "Parameters": {
-          "operation": "validate",
-          "imageKey.$": "$.imageKey",
-          "userId.$": "$.userId"
+  "Comment": "Image Processing Workflow",
+  "StartAt": "ValidateImage",
+  "States": {
+    "ValidateImage": {
+      "Type": "Task",
+      "Resource": "${ImageValidationFunction}",
+      "Parameters": {
+        "imageKey.$": "$.imageKey",
+        "userId.$": "$.userId"
+      },
+      "Next": "CheckValidationResult",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "ProcessingFailed"
+        }
+      ]
+    },
+    "CheckValidationResult": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.valid",
+          "BooleanEquals": true,
+          "Next": "ParallelImageProcessing"
+        }
+      ],
+      "Default": "ProcessingFailed"
+    },
+    "ParallelImageProcessing": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "DetectLabels",
+          "States": {
+            "DetectLabels": {
+              "Type": "Task",
+              "Resource": "${DetectLabelsFunction}",
+              "Parameters": {
+                "imageKey.$": "$.imageKey",
+                "userId.$": "$.userId"
+              },
+              "End": true
+            }
+          }
         },
-        "Next": "ParallelImageProcessing",
-        "Catch": [
-          {
-            "ErrorEquals": ["States.ALL"],
-            "ResultPath": "$.error",
-            "Next": "ProcessingFailed"
-          }
-        ]
-      },
-      "ParallelImageProcessing": {
-        "Type": "Parallel",
-        "Branches": [
-          {
-            "StartAt": "DetectLabels",
-            "States": {
-              "DetectLabels": {
-                "Type": "Task",
-                "Resource": "${DetectLabelsFunction}",
-                "Parameters": {
-                  "operation": "process",
-                  "imageKey.$": "$.imageKey",
-                  "userId.$": "$.userId"
-                },
-                "End": true
-              }
-            }
-          },
-          {
-            "StartAt": "DetectModeration",
-            "States": {
-              "DetectModeration": {
-                "Type": "Task",
-                "Resource": "${DetectModerationFunction}",
-                "Parameters": {
-                  "imageKey.$": "$.imageKey",
-                  "userId.$": "$.userId"
-                },
-                "End": true
-              }
-            }
-          },
-          {
-            "StartAt": "DetectFaces",
-            "States": {
-              "DetectFaces": {
-                "Type": "Task",
-                "Resource": "${DetectFacesFunction}",
-                "Parameters": {
-                  "imageKey.$": "$.imageKey",
-                  "userId.$": "$.userId"
-                },
-                "End": true
-              }
-            }
-          },
-          {
-            "StartAt": "RecognizeCelebrities",
-            "States": {
-              "RecognizeCelebrities": {
-                "Type": "Task",
-                "Resource": "${RecognizeCelebritiesFunction}",
-                "Parameters": {
-                  "imageKey.$": "$.imageKey",
-                  "userId.$": "$.userId"
-                },
-                "End": true
-              }
-            }
-          },
-          {
-            "StartAt": "DetectText",
-            "States": {
-              "DetectText": {
-                "Type": "Task",
-                "Resource": "${DetectTextFunction}",
-                "Parameters": {
-                  "imageKey.$": "$.imageKey",
-                  "userId.$": "$.userId"
-                },
-                "End": true
-              }
+        {
+          "StartAt": "DetectModeration",
+          "States": {
+            "DetectModeration": {
+              "Type": "Task",
+              "Resource": "${DetectModerationFunction}",
+              "Parameters": {
+                "imageKey.$": "$.imageKey",
+                "userId.$": "$.userId"
+              },
+              "End": true
             }
           }
-        ],
-        "Next": "ProcessResults",
-        "Catch": [
-          {
-            "ErrorEquals": ["States.ALL"],
-            "ResultPath": "$.error",
-            "Next": "ProcessingFailed"
-          }
-        ]
-      },
-      "ProcessResults": {
-        "Type": "Task",
-        "Resource": "${ResultsProcessorFunction}",
-        "Parameters": {
-          "imageKey.$": "$.imageKey",
-          "userId.$": "$.userId",
-          "results.$": "$"
         },
-        "Next": "ProcessingSucceeded",
-        "Catch": [
-          {
-            "ErrorEquals": ["States.ALL"],
-            "ResultPath": "$.error",
-            "Next": "ProcessingFailed"
+        {
+          "StartAt": "DetectFaces",
+          "States": {
+            "DetectFaces": {
+              "Type": "Task",
+              "Resource": "${DetectFacesFunction}",
+              "Parameters": {
+                "imageKey.$": "$.imageKey",
+                "userId.$": "$.userId"
+              },
+              "End": true
+            }
           }
-        ]
+        },
+        {
+          "StartAt": "RecognizeCelebrities",
+          "States": {
+            "RecognizeCelebrities": {
+              "Type": "Task",
+              "Resource": "${RecognizeCelebritiesFunction}",
+              "Parameters": {
+                "imageKey.$": "$.imageKey",
+                "userId.$": "$.userId"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "DetectText",
+          "States": {
+            "DetectText": {
+              "Type": "Task",
+              "Resource": "${DetectTextFunction}",
+              "Parameters": {
+                "imageKey.$": "$.imageKey",
+                "userId.$": "$.userId"
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "Next": "ProcessResults",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "ProcessingFailed"
+        }
+      ]
+    },
+    "ProcessResults": {
+      "Type": "Task",
+      "Resource": "${ResultsProcessorFunction}",
+      "Parameters": {
+        "imageKey.$": "$.imageKey",
+        "userId.$": "$.userId",
+        "results.$": "$"
       },
-      "ProcessingSucceeded": {
-        "Type": "Succeed"
-      },
-      "ProcessingFailed": {
-        "Type": "Fail",
-        "Error": "ImageProcessingError",
-        "Cause": "Image processing encountered an error"
-      }
+      "Next": "ProcessingSucceeded",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "ProcessingFailed"
+        }
+      ]
+    },
+    "ProcessingSucceeded": {
+      "Type": "Succeed"
+    },
+    "ProcessingFailed": {
+      "Type": "Fail",
+      "Error": "ImageProcessingError",
+      "Cause": "Image processing encountered an error"
     }
   }
+}

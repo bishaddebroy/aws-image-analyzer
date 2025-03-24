@@ -15,17 +15,6 @@ def lambda_handler(event, context):
     Detect labels (objects and scenes) in an image using Amazon Rekognition
     """
     try:
-        # Determine operation from input
-        operation = event.get('operation', 'process')
-        
-        if operation == 'validate':
-            # Basic validation only - in a real app, you would do more thorough checks
-            return {
-                'imageKey': event.get('imageKey'),
-                'userId': event.get('userId'),
-                'valid': True
-            }
-        
         # Get the image key from the event
         image_key = event.get('imageKey')
         if not image_key:

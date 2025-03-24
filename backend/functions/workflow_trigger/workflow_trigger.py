@@ -10,8 +10,8 @@ dynamodb = boto3.resource('dynamodb')
 step_functions = boto3.client('stepfunctions')
 
 # Get environment variables
-STATE_MACHINE_ARN = os.environ.get('STATE_MACHINE_ARN')
 RESULTS_TABLE = os.environ.get('RESULTS_TABLE')
+# STATE_MACHINE_ARN will be set by the custom resource post-deployment
 
 def lambda_handler(event, context):
     """
@@ -40,9 +40,24 @@ def lambda_handler(event, context):
         # Update DynamoDB status to 'processing'
         update_image_status(user_id, image_id, 'processing')
         
+        # Get STATE_MACHINE_ARN - it might be updated post-deployment
+        state_machine_arn = os.environ.get('STATE_MACHINE_ARN')
+        if not state_machine_arn:
+            print("STATE_MACHINE_ARN environment variable not set. Using placeholder value.")
+            # Just update status, don't try to process 
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    'message': 'Image received, but processing not yet available',
+                    'userId': user_id,
+                    'imageId': image_id,
+                    'imageKey': key
+                })
+            }
+        
         # Start the Step Functions workflow
         response = step_functions.start_execution(
-            stateMachineArn=STATE_MACHINE_ARN,
+            stateMachineArn=state_machine_arn,
             name=f"image-processing-{image_id}-{int(time.time())}",
             input=json.dumps({
                 'userId': user_id,
