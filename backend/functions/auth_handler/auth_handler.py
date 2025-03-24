@@ -1,27 +1,17 @@
 import json
 import os
 import boto3
-import base64
-import hmac
-import hashlib
 import time
-import uuid
-from urllib.parse import parse_qs
+from botocore.exceptions import ClientError
 
-# In a real application, you would use Cognito
-# For simplicity, we're using a basic auth mechanism
-
-# These would be stored in environment variables or a secure parameter store
-USERS = {
-    "demo@example.com": {
-        "password_hash": "5f4dcc3b5aa765d61d8327deb882cf99",  # 'password' in MD5
-        "user_id": "user-123"
-    }
-}
+# Initialize Cognito client
+cognito = boto3.client('cognito-idp')
+USER_POOL_ID = os.environ.get('USER_POOL_ID')
+CLIENT_ID = os.environ.get('CLIENT_ID')
 
 def lambda_handler(event, context):
     """
-    Simple authentication handler
+    Authentication handler using Cognito
     """
     try:
         body = json.loads(event.get('body', '{}'))
@@ -47,7 +37,7 @@ def lambda_handler(event, context):
 
 def handle_login(body):
     """
-    Handle login requests
+    Handle login requests using Cognito
     """
     email = body.get('email', '').lower()
     password = body.get('password', '')
@@ -59,39 +49,71 @@ def handle_login(body):
             'body': json.dumps({'message': 'Email and password are required'})
         }
     
-    user = USERS.get(email)
-    if not user:
+    try:
+        # Authenticate with Cognito
+        response = cognito.initiate_auth(
+            ClientId=CLIENT_ID,
+            AuthFlow='USER_PASSWORD_AUTH',
+            AuthParameters={
+                'USERNAME': email,
+                'PASSWORD': password
+            }
+        )
+        
+        # Extract tokens
+        id_token = response['AuthenticationResult']['IdToken']
+        access_token = response['AuthenticationResult']['AccessToken']
+        refresh_token = response['AuthenticationResult']['RefreshToken']
+        expires_in = response['AuthenticationResult']['ExpiresIn']
+        
+        # Get user attributes
+        user_info = cognito.get_user(
+            AccessToken=access_token
+        )
+        
+        # Extract user ID from Cognito sub
+        user_id = None
+        for attr in user_info['UserAttributes']:
+            if attr['Name'] == 'sub':
+                user_id = attr['Value']
+                break
+        
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'token': id_token,  # For backward compatibility
+                'idToken': id_token,
+                'accessToken': access_token,
+                'refreshToken': refresh_token,
+                'expiresIn': expires_in,
+                'userId': user_id,
+                'email': email
+            })
+        }
+    except cognito.exceptions.NotAuthorizedException:
         return {
             'statusCode': 401,
             'headers': get_cors_headers(),
             'body': json.dumps({'message': 'Invalid credentials'})
         }
-    
-    # In a real app, you would use a proper password hashing mechanism
-    password_hash = hashlib.md5(password.encode()).hexdigest()
-    if password_hash != user['password_hash']:
+    except cognito.exceptions.UserNotFoundException:
         return {
             'statusCode': 401,
             'headers': get_cors_headers(),
-            'body': json.dumps({'message': 'Invalid credentials'})
+            'body': json.dumps({'message': 'User not found'})
         }
-    
-    # Generate a simple token (in a real app, use JWT or other secure token mechanism)
-    token = generate_token(user['user_id'])
-    
-    return {
-        'statusCode': 200,
-        'headers': get_cors_headers(),
-        'body': json.dumps({
-            'token': token,
-            'userId': user['user_id'],
-            'email': email
-        })
-    }
+    except Exception as e:
+        print(f"Error during login: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'message': 'Error during login'})
+        }
 
 def handle_register(body):
     """
-    Handle registration requests
+    Handle registration requests using Cognito
     """
     email = body.get('email', '').lower()
     password = body.get('password', '')
@@ -103,51 +125,89 @@ def handle_register(body):
             'body': json.dumps({'message': 'Email and password are required'})
         }
     
-    if email in USERS:
+    try:
+        # Check if this is the demo account (for backward compatibility)
+        if email == 'demo@example.com':
+            return {
+                'statusCode': 409,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'message': 'This email is reserved for demo purposes. Please use a different email.'})
+            }
+        
+        # Register user with Cognito
+        response = cognito.sign_up(
+            ClientId=CLIENT_ID,
+            Username=email,
+            Password=password,
+            UserAttributes=[
+                {
+                    'Name': 'email',
+                    'Value': email
+                }
+            ]
+        )
+        
+        # Auto-confirm the user (for the demo app)
+        # In a real app, you might want email verification
+        cognito.admin_confirm_sign_up(
+            UserPoolId=USER_POOL_ID,
+            Username=email
+        )
+        
+        # Login the user to get tokens
+        login_response = cognito.initiate_auth(
+            ClientId=CLIENT_ID,
+            AuthFlow='USER_PASSWORD_AUTH',
+            AuthParameters={
+                'USERNAME': email,
+                'PASSWORD': password
+            }
+        )
+        
+        # Extract tokens
+        id_token = login_response['AuthenticationResult']['IdToken']
+        access_token = login_response['AuthenticationResult']['AccessToken']
+        refresh_token = login_response['AuthenticationResult']['RefreshToken']
+        expires_in = login_response['AuthenticationResult']['ExpiresIn']
+        
+        # Get user attributes
+        user_info = cognito.get_user(
+            AccessToken=access_token
+        )
+        
+        # Extract user ID from Cognito sub
+        user_id = None
+        for attr in user_info['UserAttributes']:
+            if attr['Name'] == 'sub':
+                user_id = attr['Value']
+                break
+        
+        return {
+            'statusCode': 201,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'token': id_token,  # For backward compatibility
+                'idToken': id_token,
+                'accessToken': access_token,
+                'refreshToken': refresh_token,
+                'expiresIn': expires_in,
+                'userId': user_id,
+                'email': email
+            })
+        }
+    except cognito.exceptions.UsernameExistsException:
         return {
             'statusCode': 409,
             'headers': get_cors_headers(),
             'body': json.dumps({'message': 'User already exists'})
         }
-    
-    # In a real app, you would store this in DynamoDB or another database
-    # and use a proper password hashing mechanism
-    user_id = f"user-{uuid.uuid4()}"
-    password_hash = hashlib.md5(password.encode()).hexdigest()
-    
-    USERS[email] = {
-        'password_hash': password_hash,
-        'user_id': user_id
-    }
-    
-    token = generate_token(user_id)
-    
-    return {
-        'statusCode': 201,
-        'headers': get_cors_headers(),
-        'body': json.dumps({
-            'token': token,
-            'userId': user_id,
-            'email': email
-        })
-    }
-
-def generate_token(user_id):
-    """
-    Generate a simple authentication token
-    In a real app, use JWT or another secure token mechanism
-    """
-    timestamp = int(time.time())
-    token_data = f"{user_id}:{timestamp}"
-    # This would use a proper secret key in a real application
-    signature = hmac.new(
-        "SECRET_KEY".encode(),
-        token_data.encode(),
-        hashlib.sha256
-    ).hexdigest()
-    
-    token = base64.b64encode(f"{token_data}:{signature}".encode()).decode()
-    return token
+    except Exception as e:
+        print(f"Error during registration: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'message': 'Error during registration'})
+        }
 
 def get_cors_headers():
     """

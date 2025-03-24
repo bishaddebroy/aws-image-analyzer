@@ -1,5 +1,5 @@
 #!/bin/bash
-# Complete deployment script for Image Recognition App
+# Complete deployment script for Image Recognition App with Cognito Auth
 
 # Set variables
 STACK_NAME="image-recognition-app"
@@ -62,19 +62,44 @@ aws cloudformation wait stack-update-complete --stack-name $STACK_NAME
 echo "Getting stack outputs..."
 API_URL=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" --output text)
 EC2_PUBLIC_IP=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='EC2PublicIP'].OutputValue" --output text)
+USER_POOL_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" --output text)
+USER_POOL_CLIENT_ID=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" --output text)
 
-# Update frontend configuration with API endpoint
+# Update frontend configuration with API endpoint and Cognito details
 echo "Updating frontend configuration..."
 cat > frontend/src/utils/config.js << EOF
 // Auto-generated configuration file - DO NOT EDIT MANUALLY
 export const config = {
   API_ENDPOINT: "$API_URL",
   REGION: "$REGION",
+  COGNITO: {
+    USER_POOL_ID: "$USER_POOL_ID",
+    APP_CLIENT_ID: "$USER_POOL_CLIENT_ID"
+  },
   MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
   SUPPORTED_FILE_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/bmp'],
   POLLING_INTERVAL: 3000
 };
 EOF
+
+# Create a demo user if it doesn't exist
+echo "Creating demo user in Cognito..."
+aws cognito-idp admin-create-user \
+  --user-pool-id $USER_POOL_ID \
+  --username demo@example.com \
+  --temporary-password Password123! \
+  --message-action SUPPRESS \
+  --user-attributes Name=email,Value=demo@example.com Name=email_verified,Value=true \
+  > /dev/null 2>&1 || true
+
+# Set permanent password for the demo user
+echo "Setting password for demo user..."
+aws cognito-idp admin-set-user-password \
+  --user-pool-id $USER_POOL_ID \
+  --username demo@example.com \
+  --password password \
+  --permanent \
+  > /dev/null 2>&1 || true
 
 # Build React frontend
 echo "Building frontend..."
@@ -94,3 +119,9 @@ scp -i ~/.ssh/$EC2_KEY_NAME.pem -r -o StrictHostKeyChecking=no frontend/build/* 
 echo "Deployment completed successfully!"
 echo "API URL: $API_URL"
 echo "Website URL: http://$EC2_PUBLIC_IP"
+echo "Cognito User Pool ID: $USER_POOL_ID"
+echo "Cognito App Client ID: $USER_POOL_CLIENT_ID"
+echo ""
+echo "Demo account:"
+echo "Email: demo@example.com"
+echo "Password: password"

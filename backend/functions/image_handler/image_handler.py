@@ -3,6 +3,7 @@ import os
 import boto3
 import uuid
 import time
+import base64
 from urllib.parse import unquote
 
 # Initialize AWS clients
@@ -22,7 +23,7 @@ def lambda_handler(event, context):
         http_method = event.get('httpMethod', '')
         path = event.get('path', '')
         
-        # Parse user ID from authorization header or query string
+        # Parse user ID from JWT token
         user_id = get_user_id(event)
         if not user_id:
             return {
@@ -323,29 +324,44 @@ def get_image_results(user_id, image_id):
 
 def get_user_id(event):
     """
-    Extract user ID from authorization token or query parameter
-    In a real application, this would validate a JWT token
+    Extract user ID from Cognito JWT token or query parameter
     """
-    # For simplicity, we'll accept a user ID from query parameters
-    # In a real app, this would come from a validated token
+    # For backwards compatibility and testing, still allow query parameter
     query_params = event.get('queryStringParameters') or {}
     user_id = query_params.get('userId')
-    
     if user_id:
         return user_id
     
-    # In a real app, you would validate the token and extract the user ID
-    # For this demo, we'll just check if the Authorization header exists
+    # Get the Authorization header
     headers = event.get('headers') or {}
     auth_header = headers.get('Authorization') or headers.get('authorization')
     
-    if auth_header and auth_header.startswith('Bearer '):
-        # In a real app, validate the token
-        # For demo purposes, just extract a user ID from the token
-        # This is NOT secure - use proper JWT validation in production
-        return "user-123"  # Hardcoded for demo
+    if not auth_header:
+        return None
     
-    return None
+    try:
+        # Parse JWT token (simplified, in a real app use proper JWT library)
+        # This assumes the Authorization header contains the JWT directly
+        # In a real production app, you would verify the JWT signature
+        token_parts = auth_header.split('.')
+        if len(token_parts) != 3:
+            return None
+        
+        # Decode the payload
+        payload_b64 = token_parts[1]
+        # Add padding if needed
+        payload_b64 += '=' * ((4 - len(payload_b64) % 4) % 4)
+        # Convert to standard base64
+        payload_b64 = payload_b64.replace('-', '+').replace('_', '/')
+        
+        # Decode and parse JSON
+        payload = json.loads(base64.b64decode(payload_b64).decode('utf-8'))
+        
+        # Extract sub (user ID) from token
+        return payload.get('sub')
+    except Exception as e:
+        print(f"Error parsing token: {str(e)}")
+        return None
 
 def get_cors_headers():
     """

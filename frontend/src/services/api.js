@@ -7,12 +7,13 @@ const API_URL = config.API_ENDPOINT;
  * Make an API request with proper authentication and error handling
  */
 const apiRequest = async (endpoint, options = {}) => {
-  const token = localStorage.getItem('token');
+  // Get authentication token from local storage (use idToken for Cognito)
+  const idToken = localStorage.getItem('idToken');
   
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      ...(idToken ? { 'Authorization': idToken } : {})
     }
   };
   
@@ -63,11 +64,6 @@ export const login = async (email, password) => {
     })
   });
   
-  if (data.token) {
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('userId', data.userId);
-  }
-  
   return data;
 };
 
@@ -81,11 +77,6 @@ export const register = async (email, password) => {
     })
   });
   
-  if (data.token) {
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('userId', data.userId);
-  }
-  
   return data;
 };
 
@@ -94,7 +85,6 @@ export const register = async (email, password) => {
  */
 export const uploadImage = async (file) => {
   // Step 1: Get a pre-signed URL
-  const userId = localStorage.getItem('userId');
   const urlResponse = await apiRequest('/images/upload-url', {
     method: 'POST',
     body: JSON.stringify({
@@ -119,20 +109,17 @@ export const uploadImage = async (file) => {
 };
 
 export const getImages = async () => {
-  const userId = localStorage.getItem('userId');
-  const response = await apiRequest(`/images?userId=${userId}`);
+  const response = await apiRequest('/images');
   return response.images || [];
 };
 
 export const getImageResults = async (imageId) => {
-  const userId = localStorage.getItem('userId');
-  const response = await apiRequest(`/images/${imageId}/results?userId=${userId}`);
+  const response = await apiRequest(`/images/${imageId}/results`);
   return response;
 };
 
 export const deleteImage = async (imageId) => {
-  const userId = localStorage.getItem('userId');
-  await apiRequest(`/images/${imageId}?userId=${userId}`, {
+  await apiRequest(`/images/${imageId}`, {
     method: 'DELETE'
   });
   return true;

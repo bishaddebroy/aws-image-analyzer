@@ -36,6 +36,40 @@ Globals:
     Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
 
 Resources:
+  # Cognito User Pool for Authentication
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${AppName}-user-pool-${Stage}'
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: true
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+
+  # Cognito App Client
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub '${AppName}-client-${Stage}'
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+
   # S3 Bucket for Image Storage
   ImageBucket:
     Type: AWS::S3::Bucket
@@ -87,6 +121,12 @@ Resources:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: "'*'"
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt UserPool.Arn
+        AddDefaultAuthorizerToCorsPreflight: false
   
   # Lambda Functions
   
@@ -99,6 +139,8 @@ Resources:
       Environment:
         Variables:
           STAGE: !Ref Stage
+          USER_POOL_ID: !Ref UserPool
+          CLIENT_ID: !Ref UserPoolClient
       Layers:
         - !Ref CommonDependenciesLayer
       Events:
@@ -108,6 +150,8 @@ Resources:
             RestApiId: !Ref ImageApi
             Path: /auth
             Method: post
+            Auth:
+              Authorizer: NONE
   
   # Image Handler Function
   ImageHandlerFunction:
@@ -284,7 +328,7 @@ Resources:
       SecurityGroupIds:
         - !Ref WebServerSecurityGroup
       KeyName: !Ref KeyPairName
-      ImageId: ami-08b5b3a93ed654d19  # Amazon Linux ID in us-east-1
+      ImageId: ami-08b5b3a93ed654d19  # Amazon Linux 2023 in us-east-1
       UserData:
         Fn::Base64:
           !Sub |
@@ -312,3 +356,11 @@ Outputs:
   ResultsTableName:
     Description: "Name of the DynamoDB table for storing results"
     Value: !Ref ResultsTable
+  
+  UserPoolId:
+    Description: "Cognito User Pool ID"
+    Value: !Ref UserPool
+  
+  UserPoolClientId:
+    Description: "Cognito User Pool Client ID"
+    Value: !Ref UserPoolClient
