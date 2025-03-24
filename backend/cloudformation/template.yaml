@@ -74,12 +74,17 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub '${AppName}-images-${AWS::AccountId}-${Stage}'
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt WorkflowTriggerFunction.Arn
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
             AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
             AllowedOrigins: ['*']
             MaxAge: 3600
+    DependsOn: WorkflowTriggerFunctionPermission
   
   # DynamoDB Table for Image Analysis Results
   ResultsTable:
@@ -343,21 +348,6 @@ Resources:
           Value: !Sub '${AppName}-web-server'
 
   # S3 notification configuration
-  ImageBucket:
-  Type: AWS::S3::Bucket
-  Properties:
-    BucketName: !Sub '${AppName}-images-${AWS::AccountId}-${Stage}'
-    NotificationConfiguration:
-      LambdaConfigurations:
-        - Event: s3:ObjectCreated:*
-          Function: !GetAtt WorkflowTriggerFunction.Arn
-    CorsConfiguration:
-      CorsRules:
-        - AllowedHeaders: ['*']
-          AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
-          AllowedOrigins: ['*']
-          MaxAge: 3600
-  DependsOn: WorkflowTriggerFunctionPermission
 
   # Permission for S3 to invoke Lambda
   WorkflowTriggerFunctionPermission:
