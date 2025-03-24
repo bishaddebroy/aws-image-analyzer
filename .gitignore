@@ -1,0 +1,36 @@
+# Node modules
+node_modules/
+
+# Python virtual environment
+venv/
+env/
+*.pyc
+__pycache__/
+
+# AWS SAM builds
+.aws-sam/
+packaged.yaml
+
+# Environment variables
+.env
+
+# Layer packages
+backend/layers/common_dependencies/python/
+
+# Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build output
+build/
+dist/
+*.zip
+
+# Credentials
+*.pem

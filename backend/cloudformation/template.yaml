@@ -1,0 +1,314 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Image Recognition App - Infrastructure as Code'
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    Description: Environment stage
+  
+  AppName:
+    Type: String
+    Default: image-recognition-app
+    Description: Application name
+  
+  KeyPairName:
+    Type: String
+    Description: EC2 key pair name
+  
+  UserDataBucket:
+    Type: String
+    Description: S3 bucket containing EC2 user data script
+  
+  UserDataKey:
+    Type: String
+    Description: S3 key for EC2 user data script
+
+Globals:
+  Function:
+    Runtime: python3.9
+    Timeout: 30
+    MemorySize: 256
+    Environment:
+      Variables:
+        STAGE: !Ref Stage
+    Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+
+Resources:
+  # S3 Bucket for Image Storage
+  ImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${AppName}-images-${AWS::AccountId}-${Stage}'
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ['*']
+            MaxAge: 3600
+  
+  # DynamoDB Table for Image Analysis Results
+  ResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${AppName}-results-${Stage}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: imageId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: imageId
+          KeyType: RANGE
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+  
+  # Lambda Layer for Common Dependencies
+  CommonDependenciesLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub '${AppName}-common-dependencies'
+      Description: Common dependencies for Lambda functions
+      ContentUri: ../layers/common_dependencies/
+      CompatibleRuntimes:
+        - python3.9
+  
+  # API Gateway
+  ImageApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      EndpointConfiguration: REGIONAL
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+  
+  # Lambda Functions
+  
+  # Authentication Handler
+  AuthHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../functions/auth_handler/
+      Handler: auth_handler.lambda_handler
+      Environment:
+        Variables:
+          STAGE: !Ref Stage
+      Layers:
+        - !Ref CommonDependenciesLayer
+      Events:
+        AuthRequest:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImageApi
+            Path: /auth
+            Method: post
+  
+  # Image Handler Function
+  ImageHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../functions/image_handler/
+      Handler: image_handler.lambda_handler
+      Environment:
+        Variables:
+          RESULTS_TABLE: !Ref ResultsTable
+          IMAGE_BUCKET: !Ref ImageBucket
+      Layers:
+        - !Ref CommonDependenciesLayer
+      Events:
+        GetImages:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImageApi
+            Path: /images
+            Method: get
+        GetImage:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImageApi
+            Path: /images/{imageId}
+            Method: get
+        DeleteImage:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImageApi
+            Path: /images/{imageId}
+            Method: delete
+        GetUploadUrl:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImageApi
+            Path: /images/upload-url
+            Method: post
+        GetImageResults:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImageApi
+            Path: /images/{imageId}/results
+            Method: get
+  
+  # Workflow Trigger Function
+  WorkflowTriggerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../functions/workflow_trigger/
+      Handler: workflow_trigger.lambda_handler
+      Environment:
+        Variables:
+          STATE_MACHINE_ARN: !Ref ImageProcessingStateMachine
+          RESULTS_TABLE: !Ref ResultsTable
+      Layers:
+        - !Ref CommonDependenciesLayer
+      Events:
+        S3ObjectCreated:
+          Type: S3
+          Properties:
+            Bucket: !Ref ImageBucket
+            Events: s3:ObjectCreated:*
+  
+  # Detect Labels Function
+  DetectLabelsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../functions/detect_labels/
+      Handler: detect_labels.lambda_handler
+      Environment:
+        Variables:
+          IMAGE_BUCKET: !Ref ImageBucket
+      Layers:
+        - !Ref CommonDependenciesLayer
+  
+  # Detect Moderation Function
+  DetectModerationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../functions/detect_moderation/
+      Handler: detect_moderation.lambda_handler
+      Environment:
+        Variables:
+          IMAGE_BUCKET: !Ref ImageBucket
+      Layers:
+        - !Ref CommonDependenciesLayer
+  
+  # Detect Faces Function
+  DetectFacesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../functions/detect_faces/
+      Handler: detect_faces.lambda_handler
+      Environment:
+        Variables:
+          IMAGE_BUCKET: !Ref ImageBucket
+      Layers:
+        - !Ref CommonDependenciesLayer
+  
+  # Recognize Celebrities Function
+  RecognizeCelebritiesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../functions/recognize_celebrities/
+      Handler: recognize_celebrities.lambda_handler
+      Environment:
+        Variables:
+          IMAGE_BUCKET: !Ref ImageBucket
+      Layers:
+        - !Ref CommonDependenciesLayer
+  
+  # Detect Text Function
+  DetectTextFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../functions/detect_text/
+      Handler: detect_text.lambda_handler
+      Environment:
+        Variables:
+          IMAGE_BUCKET: !Ref ImageBucket
+      Layers:
+        - !Ref CommonDependenciesLayer
+  
+  # Results Processor Function
+  ResultsProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../functions/results_processor/
+      Handler: results_processor.lambda_handler
+      Environment:
+        Variables:
+          RESULTS_TABLE: !Ref ResultsTable
+      Layers:
+        - !Ref CommonDependenciesLayer
+  
+  # Step Functions State Machine
+  ImageProcessingStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: ../step_functions/image_processing.asl.json
+      DefinitionSubstitutions:
+        DetectLabelsFunction: !GetAtt DetectLabelsFunction.Arn
+        DetectModerationFunction: !GetAtt DetectModerationFunction.Arn
+        DetectFacesFunction: !GetAtt DetectFacesFunction.Arn
+        RecognizeCelebritiesFunction: !GetAtt RecognizeCelebritiesFunction.Arn
+        DetectTextFunction: !GetAtt DetectTextFunction.Arn
+        ResultsProcessorFunction: !GetAtt ResultsProcessorFunction.Arn
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
+  
+  # EC2 Instance for Web Frontend
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for web server
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+  
+  WebServerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      SecurityGroupIds:
+        - !Ref WebServerSecurityGroup
+      KeyName: !Ref KeyPairName
+      ImageId: ami-08b5b3a93ed654d19  # Amazon Linux ID in us-east-1
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            aws s3 cp s3://${UserDataBucket}/${UserDataKey} /tmp/ec2_setup.sh
+            chmod +x /tmp/ec2_setup.sh
+            /tmp/ec2_setup.sh
+      Tags:
+        - Key: Name
+          Value: !Sub '${AppName}-web-server'
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${ImageApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+  
+  EC2PublicIP:
+    Description: "Public IP address of the EC2 instance"
+    Value: !GetAtt WebServerInstance.PublicIp
+  
+  ImageBucketName:
+    Description: "Name of the S3 bucket for storing images"
+    Value: !Ref ImageBucket
+  
+  ResultsTableName:
+    Description: "Name of the DynamoDB table for storing results"
+    Value: !Ref ResultsTable
