@@ -211,12 +211,6 @@ Resources:
           RESULTS_TABLE: !Ref ResultsTable
       Layers:
         - !Ref CommonDependenciesLayer
-      Events:
-        S3ObjectCreated:
-          Type: S3
-          Properties:
-            Bucket: !Ref ImageBucket
-            Events: s3:ObjectCreated:*
   
   # Detect Labels Function
   DetectLabelsFunction:
@@ -347,6 +341,26 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub '${AppName}-web-server'
+
+  # S3 notification configuration
+  ImageBucketNotificationConfig:
+    Type: AWS::S3::BucketNotification
+    Properties:
+      Bucket: !Ref ImageBucket
+      LambdaConfigurations:
+        - Event: s3:ObjectCreated:*
+          Function: !GetAtt WorkflowTriggerFunction.Arn
+    DependsOn:
+      - WorkflowTriggerFunctionPermission
+
+  # Permission for S3 to invoke Lambda
+  WorkflowTriggerFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WorkflowTriggerFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub "arn:aws:s3:::${ImageBucket}"
 
 Outputs:
   ApiEndpoint:
