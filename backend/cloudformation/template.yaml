@@ -343,15 +343,21 @@ Resources:
           Value: !Sub '${AppName}-web-server'
 
   # S3 notification configuration
-  ImageBucketNotificationConfig:
-    Type: AWS::S3::BucketNotification
-    Properties:
-      Bucket: !Ref ImageBucket
+  ImageBucket:
+  Type: AWS::S3::Bucket
+  Properties:
+    BucketName: !Sub '${AppName}-images-${AWS::AccountId}-${Stage}'
+    NotificationConfiguration:
       LambdaConfigurations:
         - Event: s3:ObjectCreated:*
           Function: !GetAtt WorkflowTriggerFunction.Arn
-    DependsOn:
-      - WorkflowTriggerFunctionPermission
+    CorsConfiguration:
+      CorsRules:
+        - AllowedHeaders: ['*']
+          AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+          AllowedOrigins: ['*']
+          MaxAge: 3600
+  DependsOn: WorkflowTriggerFunctionPermission
 
   # Permission for S3 to invoke Lambda
   WorkflowTriggerFunctionPermission:
