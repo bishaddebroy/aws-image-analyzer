@@ -65,5 +65,8 @@ cat > /var/www/html/index.html << EOF
 </html>
 EOF
 
+# After creating index.html in UserData
+chown ec2-user:ec2-user /var/www/html/index.html
+
 # Log completion
 echo "EC2 setup complete - $(date)" >> /var/log/ec2-setup.log
