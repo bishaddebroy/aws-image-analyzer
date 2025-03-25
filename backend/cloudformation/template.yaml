@@ -378,13 +378,29 @@ Resources:
         - !Ref WebServerSecurityGroup
       KeyName: !Ref KeyPairName
       ImageId: ami-08b5b3a93ed654d19  # Amazon Linux 2023 in us-east-1
+      IamInstanceProfile: LabRole
       UserData:
         Fn::Base64:
           !Sub |
             #!/bin/bash
-            aws s3 cp s3://${UserDataBucket}/${UserDataKey} /tmp/ec2_setup.sh
-            chmod +x /tmp/ec2_setup.sh
-            /tmp/ec2_setup.sh
+            # More robust error handling
+            set -e
+            echo "Starting EC2 setup script"
+            aws s3 cp s3://${UserDataBucket}/${UserDataKey} /tmp/ec2_setup.sh || echo "Failed to download script"
+            if [ -f /tmp/ec2_setup.sh ]; then
+              chmod +x /tmp/ec2_setup.sh
+              /tmp/ec2_setup.sh
+            else
+              echo "Fallback installation"
+              yum update -y
+              yum install -y httpd git nodejs npm
+              systemctl start httpd
+              systemctl enable httpd
+              mkdir -p /var/www/html
+              chown -R ec2-user:ec2-user /var/www/html
+              chmod -R 755 /var/www/html
+            fi
+            echo "Setup complete"
       Tags:
         - Key: Name
           Value: !Sub '${AppName}-web-server'
