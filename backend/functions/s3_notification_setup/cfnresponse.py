@@ -3,12 +3,22 @@
 
 import json
 import urllib.request
+import logging
+
+# Setup logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 SUCCESS = "SUCCESS"
 FAILED = "FAILED"
 
 def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False, reason=None):
+    """
+    Send a response to CloudFormation regarding the success or failure of a custom resource deployment
+    """
     responseUrl = event['ResponseURL']
+
+    logger.info(f"ResponseURL: {responseUrl}")
 
     responseBody = {
         'Status': responseStatus,
@@ -22,16 +32,20 @@ def send(event, context, responseStatus, responseData, physicalResourceId=None, 
     }
 
     json_response = json.dumps(responseBody)
+    logger.info(f"Response body: {json_response}")
+    
     headers = {
-        'Content-Type': '',
+        'Content-Type': 'application/json',
         'Content-Length': str(len(json_response))
     }
 
     try:
-        req = urllib.request.Request(responseUrl, json_response.encode('utf-8'), headers)
+        req = urllib.request.Request(responseUrl, json_response.encode('utf-8'), headers, method='PUT')
         with urllib.request.urlopen(req) as response:
-            print(f"Status code: {response.getcode()}")
-            return True
+            logger.info(f"Status code: {response.getcode()}")
+            logger.info(f"Response: {response.read().decode('utf-8')}")
+        logger.info("CloudFormation successfully sent response")
+        return True
     except Exception as e:
-        print(f"send(..) failed executing request: {str(e)}")
+        logger.error(f"send(..) failed executing request: {str(e)}")
         return False

@@ -315,7 +315,7 @@ Resources:
       CodeUri: ../functions/s3_notification_setup/
       Handler: s3_notification_setup.lambda_handler
       Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
-      Timeout: 60
+      Timeout: 300
       Environment:
         Variables:
           RESULTS_TABLE: !Ref ResultsTable
