@@ -3,7 +3,7 @@ Transform: AWS::Serverless-2016-10-31
 Description: 'Image Recognition App - Infrastructure as Code'
 
 Parameters:
-  Stage:
+  EnvStage:
     Type: String
     Default: dev
     Description: Environment stage
@@ -32,14 +32,14 @@ Globals:
     MemorySize: 256
     Environment:
       Variables:
-        STAGE: dev
+        STAGE: !Ref EnvStage
 
 Resources:
   # Cognito User Pool for Authentication
   UserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: !Sub '${AppName}-user-pool-${Stage}'
+      UserPoolName: !Sub '${AppName}-user-pool-${EnvStage}'
       AutoVerifiedAttributes:
         - email
       UsernameAttributes:
@@ -61,7 +61,7 @@ Resources:
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
-      ClientName: !Sub '${AppName}-client-${Stage}'
+      ClientName: !Sub '${AppName}-client-${EnvStage}'
       UserPoolId: !Ref UserPool
       GenerateSecret: false
       ExplicitAuthFlows:
@@ -73,7 +73,7 @@ Resources:
   ImageBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub '${AppName}-images-${AWS::AccountId}-${Stage}'
+      BucketName: !Sub '${AppName}-images-${AWS::AccountId}-${EnvStage}'
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
@@ -85,7 +85,7 @@ Resources:
   ResultsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub '${AppName}-results-${Stage}'
+      TableName: !Sub '${AppName}-results-${EnvStage}'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: userId
@@ -114,7 +114,7 @@ Resources:
   ImageApi:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: dev
+      StageName: !Ref EnvStage
       EndpointConfiguration: REGIONAL
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
@@ -138,7 +138,7 @@ Resources:
       Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
         Variables:
-          STAGE: !Ref Stage
+          STAGE: !Ref EnvStage
           USER_POOL_ID: !Ref UserPool
           CLIENT_ID: !Ref UserPoolClient
       Layers:
@@ -218,7 +218,7 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref WorkflowTriggerFunction
       Principal: s3.amazonaws.com
-      SourceArn: !Sub "arn:aws:s3:::${AppName}-images-${AWS::AccountId}-${Stage}"
+      SourceArn: !Sub "arn:aws:s3:::${AppName}-images-${AWS::AccountId}-${EnvStage}"
   
   # New image validation function
   ImageValidationFunction:
@@ -454,7 +454,7 @@ Resources:
 Outputs:
   ApiEndpoint:
     Description: "API Gateway endpoint URL"
-    Value: !Sub "https://${ImageApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}"
+    Value: !Sub "https://${ImageApi}.execute-api.${AWS::Region}.amazonaws.com/${EnvStage}"
   
   EC2PublicIP:
     Description: "Public IP address of the EC2 instance"

@@ -49,7 +49,7 @@ aws cloudformation deploy \
   --stack-name $STACK_NAME \
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
   --parameter-overrides \
-    Stage=dev \
+    EnvStage=dev \
     AppName=$STACK_NAME \
     KeyPairName=$EC2_KEY_NAME \
     UserDataBucket=$S3_BUCKET \
