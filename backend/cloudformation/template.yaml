@@ -32,7 +32,7 @@ Globals:
     MemorySize: 256
     Environment:
       Variables:
-        STAGE: !Ref Stage
+        STAGE: dev
 
 Resources:
   # Cognito User Pool for Authentication
