@@ -115,6 +115,7 @@ Resources:
     Type: AWS::Serverless::Api
     Properties:
       StageName: !Ref EnvStage
+      OpenApiVersion: '3.0.1'
       EndpointConfiguration: REGIONAL
       Cors:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
