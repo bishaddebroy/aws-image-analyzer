@@ -24,23 +24,10 @@
         {
           "Variable": "$.valid",
           "BooleanEquals": true,
-          "Next": "SaveOriginalData"
+          "Next": "ParallelImageProcessing"
         }
       ],
       "Default": "ProcessingFailed"
-    },
-    "SaveOriginalData": {
-      "Type": "Pass",
-      "Parameters": {
-        "originalData": {
-          "imageKey.$": "$.imageKey",
-          "userId.$": "$.userId",
-          "imageId.$": "$.imageId",
-          "bucket.$": "$.bucket"
-        }
-      },
-      "ResultPath": "$.originalData",
-      "Next": "ParallelImageProcessing"
     },
     "ParallelImageProcessing": {
       "Type": "Parallel",
@@ -130,8 +117,8 @@
       "Type": "Task",
       "Resource": "${ResultsProcessorFunction}",
       "Parameters": {
-        "imageKey.$": "$.originalData.imageKey",
-        "userId.$": "$.originalData.userId",
+        "imageKey.$": "$.imageKey",
+        "userId.$": "$.userId",
         "results.$": "$.analysisResults"
       },
       "Next": "ProcessingSucceeded",
