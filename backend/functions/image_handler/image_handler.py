@@ -4,6 +4,7 @@ import boto3
 import uuid
 import time
 import base64
+import decimal
 from urllib.parse import unquote
 
 # Initialize AWS clients
@@ -111,10 +112,15 @@ def list_images(user_id):
                     # Use a placeholder URL instead of failing
                     image_url = "#"
                 
+                # Convert any Decimal values to float
+                createdAt = item.get('createdAt', 0)
+                if isinstance(createdAt, decimal.Decimal):
+                    createdAt = float(createdAt)
+
                 images.append({
                     'imageId': item.get('imageId'),
                     'imageUrl': image_url,
-                    'createdAt': item.get('createdAt', 0),
+                    'createdAt': createdAt,
                     'status': item.get('status', 'pending'),
                     'fileName': item.get('fileName', 'unknown')
                 })
