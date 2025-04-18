@@ -104,7 +104,7 @@ echo "Setting password for demo user..."
 aws cognito-idp admin-set-user-password \
   --user-pool-id $USER_POOL_ID \
   --username demo@example.com \
-  --password password \
+  --password Password123! \
   --permanent \
   > /dev/null 2>&1 || true
 
@@ -131,4 +131,4 @@ echo "Cognito App Client ID: $USER_POOL_CLIENT_ID"
 echo ""
 echo "Demo account:"
 echo "Email: demo@example.com"
-echo "Password: password"
+echo "Password: Password123!"
