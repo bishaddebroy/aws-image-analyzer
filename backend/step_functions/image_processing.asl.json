@@ -24,10 +24,23 @@
         {
           "Variable": "$.valid",
           "BooleanEquals": true,
-          "Next": "ParallelImageProcessing"
+          "Next": "SaveOriginalData"
         }
       ],
       "Default": "ProcessingFailed"
+    },
+    "SaveOriginalData": {
+      "Type": "Pass",
+      "Parameters": {
+        "originalData": {
+          "imageKey.$": "$.imageKey",
+          "userId.$": "$.userId",
+          "imageId.$": "$.imageId",
+          "bucket.$": "$.bucket"
+        }
+      },
+      "ResultPath": "$.originalData",
+      "Next": "ParallelImageProcessing"
     },
     "ParallelImageProcessing": {
       "Type": "Parallel",
@@ -103,6 +116,7 @@
           }
         }
       ],
+      "ResultPath": "$.analysisResults",
       "Next": "ProcessResults",
       "Catch": [
         {
@@ -116,9 +130,9 @@
       "Type": "Task",
       "Resource": "${ResultsProcessorFunction}",
       "Parameters": {
-        "imageKey.$": "$.imageKey",
-        "userId.$": "$.userId",
-        "results.$": "$"
+        "imageKey.$": "$.originalData.imageKey",
+        "userId.$": "$.originalData.userId",
+        "results.$": "$.analysisResults"
       },
       "Next": "ProcessingSucceeded",
       "Catch": [
@@ -133,9 +147,15 @@
       "Type": "Succeed"
     },
     "ProcessingFailed": {
-      "Type": "Fail",
-      "Error": "ImageProcessingError",
-      "Cause": "Image processing encountered an error"
+      "Type": "Task",
+      "Resource": "${ResultsProcessorFunction}",
+      "Parameters": {
+        "imageKey.$": "$.imageKey",
+        "userId.$": "$.userId",
+        "status": "completed",
+        "error.$": "$.error"
+      },
+      "Next": "ProcessingSucceeded"
     }
   }
 }
