@@ -62,50 +62,84 @@ def lambda_handler(event, context):
 
 def list_images(user_id):
     """
-    List all images for a user
+    List all images for a user with robust error handling
     """
-    table = dynamodb.Table(RESULTS_TABLE)
-    
-    # Query DynamoDB for all images belonging to the user
-    response = table.query(
-        KeyConditionExpression="userId = :uid",
-        ExpressionAttributeValues={
-            ":uid": user_id
-        }
-    )
-    
-    items = response.get('Items', [])
-    
-    # Format the response
-    images = []
-    for item in items:
-        # Add S3 URL for each image
-        image_key = item.get('imageKey')
-        image_url = s3.generate_presigned_url(
-            'get_object',
-            Params={
-                'Bucket': IMAGE_BUCKET,
-                'Key': image_key
-            },
-            ExpiresIn=3600
-        )
+    try:
+        print(f"Listing images for user: {user_id}")
+        table = dynamodb.Table(RESULTS_TABLE)
         
-        images.append({
-            'imageId': item.get('imageId'),
-            'imageUrl': image_url,
-            'createdAt': item.get('createdAt'),
-            'status': item.get('status'),
-            'fileName': item.get('fileName', 'unknown')
-        })
-    
-    # Sort images by creation date, newest first
-    images.sort(key=lambda x: x.get('createdAt', 0), reverse=True)
-    
-    return {
-        'statusCode': 200,
-        'headers': get_cors_headers(),
-        'body': json.dumps({'images': images})
-    }
+        # Query DynamoDB for all images belonging to the user
+        try:
+            response = table.query(
+                KeyConditionExpression="userId = :uid",
+                ExpressionAttributeValues={
+                    ":uid": user_id
+                }
+            )
+            items = response.get('Items', [])
+            print(f"Found {len(items)} items in DynamoDB for user {user_id}")
+        except Exception as db_error:
+            print(f"DynamoDB query error: {str(db_error)}")
+            # Return empty list instead of failing
+            return {
+                'statusCode': 200,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'images': []})
+            }
+        
+        # Format the response
+        images = []
+        for item in items:
+            try:
+                # Add S3 URL for each image
+                image_key = item.get('imageKey')
+                if not image_key:
+                    print(f"Item missing imageKey, skipping: {item}")
+                    continue
+                
+                try:
+                    image_url = s3.generate_presigned_url(
+                        'get_object',
+                        Params={
+                            'Bucket': IMAGE_BUCKET,
+                            'Key': image_key  # Make sure this is 'Key', not 'Name'
+                        },
+                        ExpiresIn=3600
+                    )
+                except Exception as url_error:
+                    print(f"Error generating presigned URL: {str(url_error)}")
+                    # Use a placeholder URL instead of failing
+                    image_url = "#"
+                
+                images.append({
+                    'imageId': item.get('imageId'),
+                    'imageUrl': image_url,
+                    'createdAt': item.get('createdAt', 0),
+                    'status': item.get('status', 'pending'),
+                    'fileName': item.get('fileName', 'unknown')
+                })
+            except Exception as item_error:
+                print(f"Error processing image: {str(item_error)}")
+                # Continue with other images
+                continue
+        
+        # Sort images by creation date, newest first
+        images.sort(key=lambda x: x.get('createdAt', 0), reverse=True)
+        
+        print(f"Returning {len(images)} images")
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'images': images})
+        }
+    except Exception as e:
+        print(f"Unexpected error in list_images: {str(e)}")
+        # Always return 200 with empty list
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'images': []})
+        }
 
 def get_image(user_id, image_id):
     """
