@@ -13,7 +13,7 @@ const apiRequest = async (endpoint, options = {}) => {
   const defaultOptions = {
     headers: {
       'Content-Type': 'application/json',
-      ...(idToken ? { 'Authorization': idToken } : {})
+      ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
     }
   };
   

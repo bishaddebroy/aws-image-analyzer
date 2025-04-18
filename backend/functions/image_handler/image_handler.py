@@ -340,6 +340,10 @@ def get_user_id(event):
         return None
     
     try:
+        # Remove 'Bearer ' prefix if present
+        if auth_header.startswith('Bearer '):
+            auth_header = auth_header[7:]
+
         # Parse JWT token (simplified, in a real app use proper JWT library)
         # This assumes the Authorization header contains the JWT directly
         # In a real production app, you would verify the JWT signature
