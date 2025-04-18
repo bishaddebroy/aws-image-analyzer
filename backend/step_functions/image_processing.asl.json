@@ -119,7 +119,12 @@
       "Parameters": {
         "imageKey.$": "$.imageKey",
         "userId.$": "$.userId",
-        "results.$": "$.analysisResults"
+        "results.$": "$.analysisResults",
+        "labels.$": "$.analysisResults[0]",
+        "moderation.$": "$.analysisResults[1]",
+        "faces.$": "$.analysisResults[2]",
+        "celebrities.$": "$.analysisResults[3]",
+        "text.$": "$.analysisResults[4]"
       },
       "Next": "ProcessingSucceeded",
       "Catch": [
