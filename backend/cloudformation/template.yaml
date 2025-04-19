@@ -334,6 +334,83 @@ Resources:
       Layers:
         - !Ref CommonDependenciesLayer
 
+  # Auth Handler Log Group
+  AuthHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AuthHandlerFunction}"
+      RetentionInDays: 30
+
+  # Image Handler Log Group
+  ImageHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ImageHandlerFunction}"
+      RetentionInDays: 30
+
+  # Workflow Trigger Log Group
+  WorkflowTriggerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${WorkflowTriggerFunction}"
+      RetentionInDays: 30
+
+  # Image Validation Log Group
+  ImageValidationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ImageValidationFunction}"
+      RetentionInDays: 30
+
+  # Detect Labels Log Group
+  DetectLabelsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${DetectLabelsFunction}"
+      RetentionInDays: 30
+
+  # Detect Moderation Log Group
+  DetectModerationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${DetectModerationFunction}"
+      RetentionInDays: 30
+
+  # Detect Faces Log Group
+  DetectFacesLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${DetectFacesFunction}"
+      RetentionInDays: 30
+
+  # Recognize Celebrities Log Group
+  RecognizeCelebritiesLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${RecognizeCelebritiesFunction}"
+      RetentionInDays: 30
+
+  # Detect Text Log Group
+  DetectTextLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${DetectTextFunction}"
+      RetentionInDays: 30
+
+  # Results Processor Log Group
+  ResultsProcessorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ResultsProcessorFunction}"
+      RetentionInDays: 30
+
+  # S3 Notification Setup Log Group
+  S3NotificationSetupLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${S3NotificationSetupFunction}"
+      RetentionInDays: 30
+
   # Custom resource for S3 notification setup
   S3NotificationSetup:
     Type: Custom::S3NotificationSetup
