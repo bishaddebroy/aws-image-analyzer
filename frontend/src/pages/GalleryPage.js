@@ -14,37 +14,49 @@ const GalleryPage = () => {
   const [isPolling, setIsPolling] = useState(false);
   const intervalRef = useRef(null);
 
+  // Initial load of images
   useEffect(() => {
     loadImages();
   }, []);
 
-  // Fixed polling mechanism
+  // Polling mechanism that correctly handles image status changes
   useEffect(() => {
-    // Check if any images are still processing
-    const hasProcessingImages = images.some(img => 
-      img.status === 'pending' || img.status === 'processing'
-    );
+    // Function to check image status and manage polling
+    const checkAndUpdatePolling = () => {
+      // Check if any images are still processing
+      const hasProcessingImages = images.some(img => 
+        img.status === 'pending' || img.status === 'processing'
+      );
+      
+      console.log("Checking images:", hasProcessingImages ? "Some processing" : "None processing");
+      
+      // Clear any existing interval
+      if (intervalRef.current) {
+        console.log("Clearing existing polling interval");
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      
+      // Set up new interval if needed
+      if (hasProcessingImages) {
+        console.log("Starting/continuing polling for processing images");
+        
+        intervalRef.current = setInterval(() => {
+          console.log("Polling for updates");
+          loadImages(true); // Pass true to indicate this is a poll
+        }, config.POLLING_INTERVAL || 3000);
+        
+        if (!isPolling) setIsPolling(true);
+      } else if (isPolling) {
+        console.log("Stopping polling - no processing images");
+        setIsPolling(false);
+      }
+    };
     
-    // Always clear existing interval first to prevent memory leaks
-    if (intervalRef.current) {
-      console.log("Clearing existing polling interval");
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    // Run immediately and whenever images change
+    checkAndUpdatePolling();
     
-    if (hasProcessingImages && !isPolling) {
-      console.log("Starting polling for processing images");
-      setIsPolling(true);
-      intervalRef.current = setInterval(() => {
-        console.log("Polling for updates");
-        loadImages();
-      }, config.POLLING_INTERVAL || 3000);
-    } else if (!hasProcessingImages && isPolling) {
-      console.log("Stopping polling - no processing images");
-      setIsPolling(false);
-    }
-    
-    // Clean up on unmount
+    // Cleanup on unmount
     return () => {
       if (intervalRef.current) {
         console.log("Clearing polling interval on unmount");
@@ -52,17 +64,18 @@ const GalleryPage = () => {
         intervalRef.current = null;
       }
     };
-  }, [images]);
+  }, [images, isPolling]); // Both dependencies are needed
 
-  const loadImages = async () => {
-    //if (loading && isPolling) return; // Prevent concurrent requests
-
+  // Load images with polling awareness
+  const loadImages = async (isPoll = false) => {
     // Only show loading indicator for initial load, not for polling
-    if (!isPolling) {
+    if (!isPoll) {
       console.log("Loading images for the first time");
       setLoading(true);
+    } else {
+      console.log("Polling for image updates");
     }
-    console.log("Loading images...");
+    
     setError(null);
     
     try {
@@ -71,9 +84,11 @@ const GalleryPage = () => {
       setImages(imageData);
     } catch (err) {
       console.error('Error loading images:', err);
-      setError('Failed to load your images. Please try again later.');
+      // Only show errors for initial loads, not polling failures
+      if (!isPoll) {
+        setError('Failed to load your images. Please try again later.');
+      }
     } finally {
-      console.log("Finished loading images");
       setLoading(false);
     }
   };
