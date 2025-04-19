@@ -32,6 +32,7 @@ const GalleryPage = () => {
       }, config.POLLING_INTERVAL || 3000); // Poll every 3 seconds
     } else if (!hasProcessingImages && isPolling) {
       setIsPolling(false);
+      clearInterval(interval);
     }
     
     // Clean up on unmount
@@ -43,9 +44,13 @@ const GalleryPage = () => {
   }, [images, isPolling]);
 
   const loadImages = async () => {
-    if (loading && isPolling) return; // Prevent concurrent requests
+    //if (loading && isPolling) return; // Prevent concurrent requests
 
-    setLoading(true);
+    // Only show loading indicator for initial load, not for polling
+    if (!isPolling) {
+      setLoading(true);
+    }
+    
     setError(null);
     
     try {
