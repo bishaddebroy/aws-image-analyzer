@@ -11,6 +11,13 @@ from urllib.parse import unquote
 s3 = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
 
+# Add this class to your image_handler.py file
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, decimal.Decimal):
+            return float(obj)
+        return super(DecimalEncoder, self).default(obj)
+
 # Get environment variables
 RESULTS_TABLE = os.environ.get('RESULTS_TABLE')
 IMAGE_BUCKET = os.environ.get('IMAGE_BUCKET')
@@ -359,7 +366,7 @@ def get_image_results(user_id, image_id):
     return {
         'statusCode': 200,
         'headers': get_cors_headers(),
-        'body': json.dumps(results)
+        'body': json.dumps(results, cls=DecimalEncoder)
     }
 
 def get_user_id(event):
