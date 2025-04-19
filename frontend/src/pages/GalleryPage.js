@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { config } from '../utils/config';
 import { Link } from 'react-router-dom';
 import ImageGallery from '../components/Images/ImageGallery';
@@ -12,33 +12,44 @@ const GalleryPage = () => {
   const [error, setError] = useState(null);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
+  const intervalRef = useRef(null);
 
   useEffect(() => {
     loadImages();
   }, []);
 
-  // Add polling mechanism for processing images
+  // Fixed polling mechanism
   useEffect(() => {
     // Check if any images are still processing
     const hasProcessingImages = images.some(img => 
       img.status === 'pending' || img.status === 'processing'
     );
     
-    let interval;
+    // Always clear existing interval first to prevent memory leaks
+    if (intervalRef.current) {
+      console.log("Clearing existing polling interval");
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
     if (hasProcessingImages && !isPolling) {
+      console.log("Starting polling for processing images");
       setIsPolling(true);
-      interval = setInterval(() => {
+      intervalRef.current = setInterval(() => {
+        console.log("Polling for updates");
         loadImages();
-      }, config.POLLING_INTERVAL || 3000); // Poll every 3 seconds
+      }, config.POLLING_INTERVAL || 3000);
     } else if (!hasProcessingImages && isPolling) {
+      console.log("Stopping polling - no processing images");
       setIsPolling(false);
-      clearInterval(interval);
     }
     
     // Clean up on unmount
     return () => {
-      if (interval) {
-        clearInterval(interval);
+      if (intervalRef.current) {
+        console.log("Clearing polling interval on unmount");
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
   }, [images, isPolling]);
@@ -48,18 +59,21 @@ const GalleryPage = () => {
 
     // Only show loading indicator for initial load, not for polling
     if (!isPolling) {
+      console.log("Loading images for the first time");
       setLoading(true);
     }
-    
+    console.log("Loading images...");
     setError(null);
     
     try {
       const imageData = await getImages();
+      console.log("Loaded images:", imageData.map(img => `${img.imageId}: ${img.status}`));
       setImages(imageData);
     } catch (err) {
       console.error('Error loading images:', err);
       setError('Failed to load your images. Please try again later.');
     } finally {
+      console.log("Finished loading images");
       setLoading(false);
     }
   };
