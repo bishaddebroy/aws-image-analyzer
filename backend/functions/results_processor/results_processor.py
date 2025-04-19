@@ -1,3 +1,4 @@
+import decimal
 import json
 import os
 import boto3
@@ -8,6 +9,17 @@ dynamodb = boto3.resource('dynamodb')
 
 # Get environment variables
 RESULTS_TABLE = os.environ.get('RESULTS_TABLE')
+
+def convert_floats_to_decimals(obj):
+    """Convert all floating point numbers to Decimal for DynamoDB"""
+    if isinstance(obj, float):
+        return decimal.Decimal(str(obj))
+    elif isinstance(obj, dict):
+        return {k: convert_floats_to_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_floats_to_decimals(i) for i in obj]
+    else:
+        return obj
 
 def lambda_handler(event, context):
     """
@@ -61,6 +73,9 @@ def lambda_handler(event, context):
         
         # Store results in DynamoDB
         table = dynamodb.Table(RESULTS_TABLE)
+
+        # Convert all float values to Decimal for DynamoDB
+        results_for_dynamo = convert_floats_to_decimals(results)
         
         response = table.update_item(
             Key={
@@ -74,7 +89,7 @@ def lambda_handler(event, context):
                 '#updatedAt': 'updatedAt'
             },
             ExpressionAttributeValues={
-                ':results': results,
+                ':results': results_for_dynamo,
                 ':status': 'completed',
                 ':updatedAt': int(time.time())
             },
