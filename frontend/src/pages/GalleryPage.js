@@ -52,7 +52,7 @@ const GalleryPage = () => {
         intervalRef.current = null;
       }
     };
-  }, [images, isPolling]);
+  }, [images]);
 
   const loadImages = async () => {
     //if (loading && isPolling) return; // Prevent concurrent requests
