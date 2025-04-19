@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { config } from '../utils/config';
 import { Link } from 'react-router-dom';
 import ImageGallery from '../components/Images/ImageGallery';
 import Loader from '../components/Common/Loader';
@@ -10,12 +11,40 @@ const GalleryPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
 
   useEffect(() => {
     loadImages();
   }, []);
 
+  // Add polling mechanism for processing images
+  useEffect(() => {
+    // Check if any images are still processing
+    const hasProcessingImages = images.some(img => 
+      img.status === 'pending' || img.status === 'processing'
+    );
+    
+    let interval;
+    if (hasProcessingImages && !isPolling) {
+      setIsPolling(true);
+      interval = setInterval(() => {
+        loadImages();
+      }, config.POLLING_INTERVAL || 3000); // Poll every 3 seconds
+    } else if (!hasProcessingImages && isPolling) {
+      setIsPolling(false);
+    }
+    
+    // Clean up on unmount
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [images, isPolling]);
+
   const loadImages = async () => {
+    if (loading && isPolling) return; // Prevent concurrent requests
+
     setLoading(true);
     setError(null);
     
